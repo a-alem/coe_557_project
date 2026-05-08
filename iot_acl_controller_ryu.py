@@ -25,22 +25,23 @@ class IoTACLTokenController(app_manager.RyuApp):
 
     CLOUD_SERVER_IP = "10.0.0.4"
 
+    # If True: unauthenticated hosts cannot communicate with anyone.
+    # If False: auth is required only when reaching CLOUD_SERVER_IP.
+    REQUIRE_AUTH_FOR_ALL_TRAFFIC = True
+
     def __init__(self, *args, **kwargs):
         super(IoTACLTokenController, self).__init__(*args, **kwargs)
 
         self.mac_to_port = {}
         self.datapaths = {}
 
-        # Runtime ACL lists
         self.blocked_ips = set()
         self.manual_allowed_ips = set()
 
-        # Dynamic token store
-        # token: {"active": bool, "bound_ip": None or "10.0.0.x"}
+        # token -> {"active": bool, "bound_ip": None or "10.0.0.x"}
         self.tokens = {}
 
-        # Authenticated hosts
-        # ip: token
+        # ip -> token
         self.authenticated_hosts = {}
 
         wsgi = kwargs["wsgi"]
@@ -67,9 +68,8 @@ class IoTACLTokenController(app_manager.RyuApp):
 
     def delete_flow(self, datapath, match):
         ofproto = datapath.ofproto
-        parser = datapath.ofproto_parser
 
-        mod = parser.OFPFlowMod(
+        mod = datapath.ofproto_parser.OFPFlowMod(
             datapath=datapath,
             command=ofproto.OFPFC_DELETE,
             out_port=ofproto.OFPP_ANY,
@@ -78,14 +78,13 @@ class IoTACLTokenController(app_manager.RyuApp):
         )
         datapath.send_msg(mod)
 
-    def install_drop_rule(self, ip):
+    def install_drop_rule_for_ip(self, ip):
         for datapath in self.datapaths.values():
             parser = datapath.ofproto_parser
 
             match = parser.OFPMatch(
                 eth_type=ether_types.ETH_TYPE_IP,
                 ipv4_src=ip,
-                ipv4_dst=self.CLOUD_SERVER_IP,
             )
 
             self.add_flow(
@@ -97,23 +96,57 @@ class IoTACLTokenController(app_manager.RyuApp):
                 hard_timeout=0,
             )
 
-            self.logger.warning("Installed DROP rule: %s -> %s", ip, self.CLOUD_SERVER_IP)
+            self.logger.warning("Installed DROP rule for source IP: %s", ip)
 
-    def remove_drop_rule(self, ip):
+    def remove_drop_rules_for_ip(self, ip):
         for datapath in self.datapaths.values():
             parser = datapath.ofproto_parser
 
-            match = parser.OFPMatch(
+            # Remove source-only drop rule
+            match_src_only = parser.OFPMatch(
+                eth_type=ether_types.ETH_TYPE_IP,
+                ipv4_src=ip,
+            )
+            self.delete_flow(datapath, match_src_only)
+
+            # Remove old cloud-specific drop rule if it exists
+            match_cloud_specific = parser.OFPMatch(
                 eth_type=ether_types.ETH_TYPE_IP,
                 ipv4_src=ip,
                 ipv4_dst=self.CLOUD_SERVER_IP,
             )
+            self.delete_flow(datapath, match_cloud_specific)
 
-            self.delete_flow(datapath, match)
-            self.logger.info("Removed DROP rule if present: %s -> %s", ip, self.CLOUD_SERVER_IP)
+            self.logger.info("Removed DROP rules for IP if present: %s", ip)
 
+    def clear_all_flows_and_reinstall_table_miss(self):
+        for datapath in self.datapaths.values():
+            parser = datapath.ofproto_parser
+            ofproto = datapath.ofproto
 
-    # Token/auth logic
+            # Delete all flows
+            match = parser.OFPMatch()
+            mod = parser.OFPFlowMod(
+                datapath=datapath,
+                command=ofproto.OFPFC_DELETE,
+                out_port=ofproto.OFPP_ANY,
+                out_group=ofproto.OFPG_ANY,
+                match=match,
+            )
+            datapath.send_msg(mod)
+
+            # Reinstall table-miss rule
+            actions = [
+                parser.OFPActionOutput(
+                    ofproto.OFPP_CONTROLLER,
+                    ofproto.OFPCML_NO_BUFFER,
+                )
+            ]
+            self.add_flow(datapath, priority=0, match=parser.OFPMatch(), actions=actions)
+
+        self.logger.info("Cleared all flows and reinstalled table-miss rule")
+
+    # Token and auth logic
     def create_token(self):
         token = str(uuid.uuid4())
         self.tokens[token] = {
@@ -130,41 +163,44 @@ class IoTACLTokenController(app_manager.RyuApp):
 
         if bound_ip:
             self.authenticated_hosts.pop(bound_ip, None)
-            self.install_drop_rule(bound_ip)
+            self.install_drop_rule_for_ip(bound_ip)
 
         del self.tokens[token]
         return True, "token revoked"
 
     def authenticate_host(self, ip, token):
         if token not in self.tokens:
-            self.install_drop_rule(ip)
+            self.install_drop_rule_for_ip(ip)
             return False, "invalid token"
 
         token_record = self.tokens[token]
 
         if not token_record["active"]:
-            self.install_drop_rule(ip)
+            self.install_drop_rule_for_ip(ip)
             return False, "token is inactive"
 
         bound_ip = token_record["bound_ip"]
 
-        # Token is unused, so bind it to this host
         if bound_ip is None:
             token_record["bound_ip"] = ip
             self.authenticated_hosts[ip] = token
             self.blocked_ips.discard(ip)
-            self.remove_drop_rule(ip)
+
+            # Remove any stale drop rule.
+            self.remove_drop_rules_for_ip(ip)
+
             return True, "host authenticated and token bound"
 
-        # Token is already bound to the same host
         if bound_ip == ip:
             self.authenticated_hosts[ip] = token
             self.blocked_ips.discard(ip)
-            self.remove_drop_rule(ip)
+
+            # Remove any stale drop rule.
+            self.remove_drop_rules_for_ip(ip)
+
             return True, "host already authenticated"
 
-        # Token is already used by another host
-        self.install_drop_rule(ip)
+        self.install_drop_rule_for_ip(ip)
         return False, "token already bound to another host"
 
     def logout_host(self, ip):
@@ -173,7 +209,7 @@ class IoTACLTokenController(app_manager.RyuApp):
         if token and token in self.tokens:
             self.tokens[token]["bound_ip"] = None
 
-        self.install_drop_rule(ip)
+        self.install_drop_rule_for_ip(ip)
         return True
 
     def is_host_allowed(self, ip):
@@ -188,6 +224,12 @@ class IoTACLTokenController(app_manager.RyuApp):
 
         return False
 
+    def should_enforce_auth(self, dst_ip):
+        if self.REQUIRE_AUTH_FOR_ALL_TRAFFIC:
+            return True
+
+        return dst_ip == self.CLOUD_SERVER_IP
+
     # OpenFlow event handlers
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
@@ -197,10 +239,12 @@ class IoTACLTokenController(app_manager.RyuApp):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
 
-        # Table-miss rule: send unknown traffic to controller
         match = parser.OFPMatch()
         actions = [
-            parser.OFPActionOutput(ofproto.OFPP_CONTROLLER, ofproto.OFPCML_NO_BUFFER)
+            parser.OFPActionOutput(
+                ofproto.OFPP_CONTROLLER,
+                ofproto.OFPCML_NO_BUFFER,
+            )
         ]
 
         self.add_flow(datapath, priority=0, match=match, actions=actions)
@@ -242,26 +286,16 @@ class IoTACLTokenController(app_manager.RyuApp):
             src_ip = ip_pkt.src
             dst_ip = ip_pkt.dst
 
-            if not self.is_host_allowed(src_ip):
+            self.logger.info("IPv4 packet: %s -> %s", src_ip, dst_ip)
+
+            if self.should_enforce_auth(dst_ip) and not self.is_host_allowed(src_ip):
                 self.logger.warning(
                     "BLOCKED unauthenticated/unauthorized host: %s -> %s",
                     src_ip,
                     dst_ip,
                 )
 
-                match = parser.OFPMatch(
-                    eth_type=ether_types.ETH_TYPE_IP,
-                    ipv4_src=src_ip,
-                )
-
-                self.add_flow(
-                    datapath=datapath,
-                    priority=100,
-                    match=match,
-                    actions=[],
-                    idle_timeout=0,
-                    hard_timeout=0,
-                )
+                self.install_drop_rule_for_ip(src_ip)
 
                 delay_ms = (time.time() - start_time) * 1000
                 self.logger.info("Controller decision time: %.3f ms", delay_ms)
@@ -275,20 +309,24 @@ class IoTACLTokenController(app_manager.RyuApp):
         else:
             out_port = ofproto.OFPP_FLOOD
 
-        actions = [parser.OFPActionOutput(out_port)]
+        actions = [
+            parser.OFPActionOutput(out_port)
+        ]
 
         if out_port != ofproto.OFPP_FLOOD:
             match = parser.OFPMatch(
                 in_port=in_port,
-                eth_dst=dst_mac,
                 eth_src=src_mac,
+                eth_dst=dst_mac,
             )
+
             self.add_flow(
                 datapath=datapath,
                 priority=1,
                 match=match,
                 actions=actions,
                 idle_timeout=30,
+                hard_timeout=0,
             )
 
         out = parser.OFPPacketOut(
@@ -298,6 +336,7 @@ class IoTACLTokenController(app_manager.RyuApp):
             actions=actions,
             data=msg.data,
         )
+
         datapath.send_msg(out)
 
         delay_ms = (time.time() - start_time) * 1000
@@ -323,20 +362,29 @@ class IoTRESTController(ControllerBase):
         except Exception:
             return {}
 
-    # State
     @route("iot", "/state", methods=["GET"])
     def get_state(self, req, **kwargs):
         app = self.iot_app
 
         return self.json_response({
             "cloud_server_ip": app.CLOUD_SERVER_IP,
+            "require_auth_for_all_traffic": app.REQUIRE_AUTH_FOR_ALL_TRAFFIC,
             "blocked_ips": sorted(list(app.blocked_ips)),
             "manual_allowed_ips": sorted(list(app.manual_allowed_ips)),
             "authenticated_hosts": app.authenticated_hosts,
             "tokens": app.tokens,
         })
 
-    # ACL endpoints
+    @route("iot", "/flows/clear", methods=["POST"])
+    def clear_flows(self, req, **kwargs):
+        app = self.iot_app
+        app.clear_all_flows_and_reinstall_table_miss()
+
+        return self.json_response({
+            "message": "all flows cleared and table-miss rule reinstalled",
+        })
+
+    # Runtime ACL endpoints
     @route("iot", "/acl", methods=["GET"])
     def get_acl(self, req, **kwargs):
         app = self.iot_app
@@ -359,11 +407,11 @@ class IoTRESTController(ControllerBase):
         app.manual_allowed_ips.discard(ip)
         app.authenticated_hosts.pop(ip, None)
 
-        for token, record in app.tokens.items():
+        for _, record in app.tokens.items():
             if record["bound_ip"] == ip:
                 record["bound_ip"] = None
 
-        app.install_drop_rule(ip)
+        app.install_drop_rule_for_ip(ip)
 
         return self.json_response({
             "message": "host blocked",
@@ -381,7 +429,9 @@ class IoTRESTController(ControllerBase):
 
         app.blocked_ips.discard(ip)
         app.manual_allowed_ips.add(ip)
-        app.remove_drop_rule(ip)
+
+        # Remove old drop rule when manually allowing.
+        app.remove_drop_rules_for_ip(ip)
 
         return self.json_response({
             "message": "host manually allowed",
