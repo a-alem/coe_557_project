@@ -10,3 +10,4 @@ services:
       - "8080:8080"   # REST API port
     volumes:
       - ./iot_acl_controller_ryu.py:/app/iot_acl_controller_ryu.py:ro
+      - ./controller:/app/controller:ro
