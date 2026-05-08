@@ -21,7 +21,7 @@ When a device sends traffic:
 - The controller checks the policy, it then installs a rule to either allow or drop the traffic
 
 # 🛠️ Installation
-An amd64 AWS EC2 instance running Ubuntu22.04 was used to deploy this project, more can be found in the `/terraform` directory which holds all infrastructure related configurations
+The project runs on Ubuntu with Mininet + Open vSwitch + Ryu.
 
 ## 🎨 Simplified Diagram
           +----------------------+
@@ -99,7 +99,7 @@ ryu-manager --version
 ```
 
 # 💿 Running The Project
-Clone this repository, and change directory into it after activating your virtual env (if needed), then run the following:
+Clone this repository and change directory into it after activating your virtual env (if needed), then run:
 ```bash
 ryu-manager iot_acl_controller_ryu.py
 ```
@@ -131,7 +131,21 @@ sh ovs-ofctl -O OpenFlow13 dump-flows s1
 ```
 
 # 🧩 Testing
-For testing related commands and overview, please check `testing.md` document
+For runtime checks and demo commands, see `testing.md`.
+
+For refactor regression tests:
+```bash
+python3 -m unittest discover -s tests -p "test_*.py" -v
+```
+
+# 📁 Controller Structure
+The controller has been refactored into modular components:
+
+- `controller/app.py`: OpenFlow event handlers and packet-in flow.
+- `controller/openflow.py`: reusable OpenFlow flow programming helpers.
+- `controller/policy.py`: ACL + token/authentication state and decisions.
+- `controller/rest.py`: REST API endpoints and request/response handling.
+- `iot_acl_controller_ryu.py`: thin Ryu entry-point module.
 
 # 🎛️ HTTP REST Controllers
 This project extends the typical Ryu controller flow with an additional WSGI implemented HTTP REST controller layer embedded into the Ryu controller itself.
@@ -157,7 +171,6 @@ The following controllers/APIs mapping are embedded into Ryu:
   - `POST /clear`: Manually clear all flow rules installed on the switch
 
 More details on the REST APIs with saved examples and payload structures are available in the POSTMAN collection of the project.
-
 # 🔮 Future Work
 We plan on extending this project to include an API gateway and proper authentication for REST endpoints, where:
 - API gateway manages API endpoints versioning, and terminates traffic before it is forwarded back to the cluster of other endpoints.
