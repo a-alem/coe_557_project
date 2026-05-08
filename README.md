@@ -153,6 +153,8 @@ The following controllers/APIs mapping are embedded into Ryu:
 - `/auth`: Controller for logging in using a token
   - `POST /login`: Bind an IP address to a token, resulting in a logged in host
 - `GET /state`: Controller and sole endpoint for listing the current configurations, ACLs, and token-ip associations.
+- `/flows`: Controller for flow rules management
+  - `POST /clear`: Manually clear all flow rules installed on the switch
 
 More details on the REST APIs with saved examples and payload structures are available in the POSTMAN collection of the project.
 
