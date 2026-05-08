@@ -103,10 +103,10 @@ h2 ping -c 3 h4
 h3 ping -c 3 h4
 ```
 
-The expected behavoir should be:
+The expected behavior should be, as these hosts are not **authenticated** yet:
 ```
-h1 -> h4: allowed
-h2 -> h4: allowed
+h1 -> h4: blocked
+h2 -> h4: blocked
 h3 -> h4: blocked
 ```
 
@@ -114,3 +114,28 @@ You can view the installed policies in the switch by OpenFlow (Through the Ryu c
 ```bash
 sh ovs-ofctl -O OpenFlow13 dump-flows s1
 ```
+
+# 🧩 Testing
+For testing related commands and overview, please check `testing.md` document
+
+# 🎛️ HTTP REST Controllers
+This project extends the typical Ryu controller flow with an additional WSGI implemented HTTP REST controller layer embedded into the Ryu controller itself.
+
+The goal is to use these controllers and the APIs they expose to manage ACL rules and token authentication at runtime to extend the usability of Ryu.
+
+By default, all hosts are **unauthenticated**, which means no host can access the network or connect to any host. Once a host is authenticated with a token, it can access resources in the network. ACL endpoints provide an additional way to permanently block or unblock a specific host entirely from accessing the network, even if the host was already authenticated with a token.
+
+A given token cannot be used by more than one host at a time, securing the flow of connection and preventing spoofing and replay attacks.
+
+The following controllers/APIs mapping are embedded into Ryu:
+- `/acl`: Controller for ACL, the following are its endpoints
+  - `POST /block`: blocks a given IP from accessing the network
+  - `POST /allow`: unblock an already blocked IP
+- `/token`: Controller for tokens, the following are its endpoints
+  - `POST /create`: Creates an access token
+  - `POST /revoke`: Revoke a given access token
+- `/auth`: Controller for logging in using a token
+  - `POST /login`: Bind an IP address to a token, resulting in a logged in host
+- `GET /state`: Controller and sole endpoint for listing the current configurations, ACLs, and token-ip associations.
+
+More details on the REST APIs with saved examples and payload structures are available in the POSTMAN collection of the project.

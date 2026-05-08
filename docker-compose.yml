@@ -1,0 +1,12 @@
+services:
+  ryu-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ryu-iot-controller
+    restart: unless-stopped
+    ports:
+      - "6653:6653"   # OpenFlow controller port
+      - "8080:8080"   # REST API port
+    volumes:
+      - ./iot_acl_controller_ryu.py:/app/iot_acl_controller_ryu.py:ro
