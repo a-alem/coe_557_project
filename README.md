@@ -41,6 +41,22 @@ An amd64 AWS EC2 instance running Ubuntu22.04 was used to deploy this project, m
              (IoT)(IoT)(Bad)   (Server)
 
 ## ⚙️ Installation Steps
+We offer two modes of deploying the ryu controller in this project, either in a container, which is the recommended way as it abstracts away many issues and provide a platform-agnostic, consistent and fault-tolerant deployment. Or by installing it to the host directly, feel free to use any approach.
+
+### 📦 Running through Docker (Recommended)
+Make sure you have Docker engine installed and running first, follow the guide in Docker's official installation guide [here](https://docs.docker.com/engine/install/).
+
+To run the project, simply run the following command:
+```bash
+sudo docker compose up -d
+```
+
+You can check the container status by running:
+```bash
+sudo docker ps
+```
+
+### 🎯 Installing to the host
 Install required packages:
 ```bash
 sudo apt update
