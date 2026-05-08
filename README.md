@@ -73,8 +73,9 @@ Create virtual env for Python3.9 and activate it to avoid package issues with yo
 ```bash
 python3.9 -m venv ~/ryu-venv
 source ~/ryu-venv/bin/activate
-pip install --upgrade pip setuptools wheel
-pip install ryu==4.34 eventlet==0.30.2
+pip install "pip==23.3.2" "setuptools==67.6.1" wheel
+pip install --no-build-isolation eventlet==0.30.2
+pip install --no-build-isolation ryu==4.34
 ```
 
 Finally, to verify that Ryu was installed correctly, run the following:

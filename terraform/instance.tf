@@ -7,7 +7,7 @@ resource "aws_key_pair" "coe_557_project" {
 // Instances EC2
 resource "aws_instance" "coe_557_project_server" {
   ami = "ami-0281b0943230d40d1"
-  instance_type = "t3.xlarge"
+  instance_type = "t3.medium"
   availability_zone = var.av_zone
   subnet_id = aws_subnet.coe_557_subnet_public.id
   key_name = aws_key_pair.coe_557_project.key_name
