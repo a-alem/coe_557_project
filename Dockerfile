@@ -22,6 +22,7 @@ RUN pip install --no-cache-dir --no-build-isolation \
     ryu==4.34
 
 COPY iot_acl_controller_ryu.py /app/iot_acl_controller_ryu.py
+COPY controller /app/controller
 
 EXPOSE 6653 8080
 
