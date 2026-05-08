@@ -6,15 +6,14 @@ To address this, we designed a system where a centralized SDN controller dynamic
 We implemented the system using:
 - Mininet for network simulation
 - Open vSwitch as the SDN switch
-- Ryu controller for implementing access control logic
+- Ryu controller for implementing access control logic and token based authentication for hosts
 
 Our network consists of:
-- Two authorized IoT devices (h1, h2)
-- One unauthorized device (h3)
+- Three un-authorized by default IoT devices (h1, h2, h3)
 - One cloud server (h4)
 
 The controller enforces a simple Access Control List (ACL):
-- Authorized devices are allowed to communicate with the server
+- Authorized devices are allowed to communicate with other hosts
 - Unauthorized devices are automatically blocked
 
 When a device sends traffic:
@@ -38,7 +37,7 @@ An amd64 AWS EC2 instance running Ubuntu22.04 was used to deploy this project, m
              +---+---+---+----+
                  |   |   |
                 h1  h2  h3        h4
-             (IoT)(IoT)(Bad)   (Server)
+             (IoT)(IoT)(IoT)   (Server)
 
 ## ⚙️ Installation Steps
 We offer two modes of deploying the ryu controller in this project, either in a container, which is the recommended way as it abstracts away many issues and provide a platform-agnostic, consistent and fault-tolerant deployment. Or by installing it to the host directly, feel free to use any approach.
@@ -148,6 +147,7 @@ The following controllers/APIs mapping are embedded into Ryu:
   - `POST /block`: blocks a given IP from accessing the network
   - `POST /allow`: unblock an already blocked IP
 - `/token`: Controller for tokens, the following are its endpoints
+  - `GET /`: List all tokens
   - `POST /create`: Creates an access token
   - `POST /revoke`: Revoke a given access token
 - `/auth`: Controller for logging in using a token
@@ -155,3 +155,10 @@ The following controllers/APIs mapping are embedded into Ryu:
 - `GET /state`: Controller and sole endpoint for listing the current configurations, ACLs, and token-ip associations.
 
 More details on the REST APIs with saved examples and payload structures are available in the POSTMAN collection of the project.
+
+# 🔮 Future Work
+We plan on extending this project to include an API gateway and proper authentication for REST endpoints, where:
+- API gateway manages API endpoints versioning, and terminates traffic before it is forwarded back to the cluster of other endpoints.
+- The API gateway will provide a unified singular interface for all hosts wishing to communicate with it.
+- To achieve this, a Microservices approach will be developed where each micro-service will host a specific functionality, like token management, login, acl etc.
+- Hosts will only be able to consume API endpoints that the API gateway exposes, thus hiding more sensitive endpoints like token management.
