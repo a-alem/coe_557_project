@@ -7,6 +7,8 @@ class AccessPolicyService:
         self.manual_allowed_ips = set()
         self.tokens = {}
         self.authenticated_hosts = {}
+        self.allowed_icmp_return_flows = set()
+
         self._install_drop = drop_installer
         self._remove_drop = drop_remover
 
@@ -26,6 +28,7 @@ class AccessPolicyService:
         if bound_ip:
             self.authenticated_hosts.pop(bound_ip, None)
             self._install_drop(bound_ip)
+            self.remove_return_flows_for_ip(bound_ip)
 
         del self.tokens[token]
         return True, "token revoked"
@@ -38,7 +41,7 @@ class AccessPolicyService:
         token_record = self.tokens[token]
         if not token_record["active"]:
             self._install_drop(ip)
-            return False, "token is inactive"
+            return False, "token inactive"
 
         bound_ip = token_record["bound_ip"]
 
@@ -65,9 +68,10 @@ class AccessPolicyService:
             self.tokens[token]["bound_ip"] = None
 
         self._install_drop(ip)
+        self.remove_return_flows_for_ip(ip)
         return True
 
-    def is_host_allowed(self, ip):
+    def is_host_authenticated_or_allowed(self, ip):
         if ip in self.blocked_ips:
             return False
 
@@ -79,6 +83,17 @@ class AccessPolicyService:
 
         return False
 
+    def remember_icmp_return_flow(self, src_ip, dst_ip):
+        self.allowed_icmp_return_flows.add((dst_ip, src_ip))
+
+    def is_icmp_return_allowed(self, src_ip, dst_ip):
+        return (src_ip, dst_ip) in self.allowed_icmp_return_flows
+
+    def remove_return_flows_for_ip(self, ip):
+        self.allowed_icmp_return_flows = {
+            flow for flow in self.allowed_icmp_return_flows if ip not in flow
+        }
+
     def block_host(self, ip):
         self.blocked_ips.add(ip)
         self.manual_allowed_ips.discard(ip)
@@ -88,6 +103,7 @@ class AccessPolicyService:
             if record["bound_ip"] == ip:
                 record["bound_ip"] = None
 
+        self.remove_return_flows_for_ip(ip)
         self._install_drop(ip)
 
     def allow_host(self, ip):
@@ -95,10 +111,20 @@ class AccessPolicyService:
         self.manual_allowed_ips.add(ip)
         self._remove_drop(ip)
 
+    def clear_state(self):
+        self.blocked_ips.clear()
+        self.manual_allowed_ips.clear()
+        self.tokens.clear()
+        self.authenticated_hosts.clear()
+        self.allowed_icmp_return_flows.clear()
+
     def snapshot(self):
         return {
             "blocked_ips": sorted(list(self.blocked_ips)),
             "manual_allowed_ips": sorted(list(self.manual_allowed_ips)),
             "authenticated_hosts": self.authenticated_hosts,
             "tokens": self.tokens,
+            "allowed_icmp_return_flows": sorted(
+                [f"{src}->{dst}" for src, dst in self.allowed_icmp_return_flows]
+            ),
         }

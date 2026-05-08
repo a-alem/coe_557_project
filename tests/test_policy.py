@@ -23,7 +23,7 @@ class AccessPolicyServiceTest(unittest.TestCase):
         self.assertEqual("10.0.0.1", self.policy.tokens[token]["bound_ip"])
         self.assertIn("10.0.0.1", self.policy.authenticated_hosts)
         self.assertIn("10.0.0.1", self.removed)
-        self.assertTrue(self.policy.is_host_allowed("10.0.0.1"))
+        self.assertTrue(self.policy.is_host_authenticated_or_allowed("10.0.0.1"))
 
     def test_token_cannot_be_reused_by_different_host(self):
         token = self.policy.create_token()
@@ -59,12 +59,22 @@ class AccessPolicyServiceTest(unittest.TestCase):
 
     def test_manual_block_overrides_allow(self):
         self.policy.allow_host("10.0.0.3")
-        self.assertTrue(self.policy.is_host_allowed("10.0.0.3"))
+        self.assertTrue(self.policy.is_host_authenticated_or_allowed("10.0.0.3"))
 
         self.policy.block_host("10.0.0.3")
 
-        self.assertFalse(self.policy.is_host_allowed("10.0.0.3"))
+        self.assertFalse(self.policy.is_host_authenticated_or_allowed("10.0.0.3"))
         self.assertIn("10.0.0.3", self.installed)
+
+    def test_logout_removes_related_icmp_return_flows(self):
+        token = self.policy.create_token()
+        self.policy.authenticate_host("10.0.0.1", token)
+        self.policy.remember_icmp_return_flow("10.0.0.1", "10.0.0.4")
+        self.assertTrue(self.policy.is_icmp_return_allowed("10.0.0.4", "10.0.0.1"))
+
+        self.policy.logout_host("10.0.0.1")
+
+        self.assertFalse(self.policy.is_icmp_return_allowed("10.0.0.4", "10.0.0.1"))
 
 
 if __name__ == "__main__":

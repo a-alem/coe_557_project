@@ -4,7 +4,7 @@ from webob import Response
 
 from ryu.app.wsgi import ControllerBase, route
 
-from .constants import APP_INSTANCE_NAME, CLOUD_SERVER_IP
+from .constants import APP_INSTANCE_NAME
 
 
 class IoTRESTController(ControllerBase):
@@ -28,9 +28,29 @@ class IoTRESTController(ControllerBase):
 
     @route("iot", "/state", methods=["GET"])
     def get_state(self, req, **kwargs):
-        state = self.iot_app.policy.snapshot()
-        state["cloud_server_ip"] = CLOUD_SERVER_IP
-        return self.json_response(state)
+        return self.json_response(self.iot_app.policy.snapshot())
+
+    @route("iot", "/flows/clear", methods=["POST"])
+    def clear_flows(self, req, **kwargs):
+        self.iot_app.flow_manager.clear_all_flows_and_reinstall_table_miss(
+            self.iot_app.datapaths
+        )
+
+        return self.json_response({
+            "message": "all flows cleared and table-miss rule reinstalled",
+        })
+
+    @route("iot", "/state/clear", methods=["POST"])
+    def clear_state(self, req, **kwargs):
+        self.iot_app.policy.clear_state()
+        self.iot_app.mac_to_port.clear()
+        self.iot_app.flow_manager.clear_all_flows_and_reinstall_table_miss(
+            self.iot_app.datapaths
+        )
+
+        return self.json_response({
+            "message": "controller state and flows cleared",
+        })
 
     @route("iot", "/acl", methods=["GET"])
     def get_acl(self, req, **kwargs):
@@ -48,6 +68,7 @@ class IoTRESTController(ControllerBase):
             return self.json_response({"error": "missing ip"}, status=400)
 
         self.iot_app.policy.block_host(ip)
+
         return self.json_response({
             "message": "host blocked",
             "ip": ip,
@@ -62,6 +83,7 @@ class IoTRESTController(ControllerBase):
             return self.json_response({"error": "missing ip"}, status=400)
 
         self.iot_app.policy.allow_host(ip)
+
         return self.json_response({
             "message": "host manually allowed",
             "ip": ip,
@@ -74,6 +96,7 @@ class IoTRESTController(ControllerBase):
     @route("iot", "/token/create", methods=["POST"])
     def token_create(self, req, **kwargs):
         token = self.iot_app.policy.create_token()
+
         return self.json_response({
             "message": "token created",
             "token": token,
@@ -99,6 +122,7 @@ class IoTRESTController(ControllerBase):
     @route("iot", "/auth/login", methods=["POST"])
     def auth_login(self, req, **kwargs):
         body = self.parse_body(req)
+
         ip = body.get("ip")
         token = body.get("token")
 
@@ -109,13 +133,12 @@ class IoTRESTController(ControllerBase):
             return self.json_response({"error": "missing token"}, status=400)
 
         ok, message = self.iot_app.policy.authenticate_host(ip, token)
-        status = 200 if ok else 403
 
         return self.json_response({
             "authenticated": ok,
             "message": message,
             "ip": ip,
-        }, status=status)
+        }, status=200 if ok else 403)
 
     @route("iot", "/auth/logout", methods=["POST"])
     def auth_logout(self, req, **kwargs):
@@ -126,6 +149,7 @@ class IoTRESTController(ControllerBase):
             return self.json_response({"error": "missing ip"}, status=400)
 
         self.iot_app.policy.logout_host(ip)
+
         return self.json_response({
             "message": "host logged out and blocked",
             "ip": ip,
