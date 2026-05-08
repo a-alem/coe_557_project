@@ -242,34 +242,32 @@ class IoTACLTokenController(app_manager.RyuApp):
             src_ip = ip_pkt.src
             dst_ip = ip_pkt.dst
 
-            if dst_ip == self.CLOUD_SERVER_IP:
-                if not self.is_host_allowed(src_ip):
-                    self.logger.warning(
-                        "BLOCKED unauthenticated/unauthorized host: %s -> %s",
-                        src_ip,
-                        dst_ip,
-                    )
+            if not self.is_host_allowed(src_ip):
+                self.logger.warning(
+                    "BLOCKED unauthenticated/unauthorized host: %s -> %s",
+                    src_ip,
+                    dst_ip,
+                )
 
-                    match = parser.OFPMatch(
-                        eth_type=ether_types.ETH_TYPE_IP,
-                        ipv4_src=src_ip,
-                        ipv4_dst=dst_ip,
-                    )
+                match = parser.OFPMatch(
+                    eth_type=ether_types.ETH_TYPE_IP,
+                    ipv4_src=src_ip,
+                )
 
-                    self.add_flow(
-                        datapath=datapath,
-                        priority=100,
-                        match=match,
-                        actions=[],
-                        idle_timeout=0,
-                        hard_timeout=0,
-                    )
+                self.add_flow(
+                    datapath=datapath,
+                    priority=100,
+                    match=match,
+                    actions=[],
+                    idle_timeout=0,
+                    hard_timeout=0,
+                )
 
-                    delay_ms = (time.time() - start_time) * 1000
-                    self.logger.info("Controller decision time: %.3f ms", delay_ms)
-                    return
+                delay_ms = (time.time() - start_time) * 1000
+                self.logger.info("Controller decision time: %.3f ms", delay_ms)
+                return
 
-                self.logger.info("ALLOWED host: %s -> %s", src_ip, dst_ip)
+            self.logger.info("ALLOWED host: %s -> %s", src_ip, dst_ip)
 
         # Normal learning-switch forwarding
         if dst_mac in self.mac_to_port[dpid]:
