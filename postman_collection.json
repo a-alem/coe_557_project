@@ -1,0 +1,456 @@
+{
+  "info": {
+    "name": "SDN IoT Controller API",
+    "_postman_id": "c3c1a01e-6a5a-42b1-bd1f-0cc50d8f0a01",
+    "description": "Postman collection for the SDN-based IoT access control and token authentication controller.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8080"
+    },
+    {
+      "key": "h1_ip",
+      "value": "10.0.0.1"
+    },
+    {
+      "key": "h2_ip",
+      "value": "10.0.0.2"
+    },
+    {
+      "key": "h3_ip",
+      "value": "10.0.0.3"
+    },
+    {
+      "key": "h4_ip",
+      "value": "10.0.0.4"
+    },
+    {
+      "key": "token_latest",
+      "value": ""
+    },
+    {
+      "key": "token_h1",
+      "value": ""
+    },
+    {
+      "key": "token_h2",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "State",
+      "item": [
+        {
+          "name": "Get Controller State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/state",
+              "host": ["{{baseUrl}}"],
+              "path": ["state"]
+            }
+          }
+        },
+        {
+          "name": "Clear Controller State",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/state/clear",
+              "host": ["{{baseUrl}}"],
+              "path": ["state", "clear"]
+            }
+          }
+        },
+        {
+          "name": "Clear Flow Rules Only",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/flows/clear",
+              "host": ["{{baseUrl}}"],
+              "path": ["flows", "clear"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tokens",
+      "item": [
+        {
+          "name": "List Tokens",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/token",
+              "host": ["{{baseUrl}}"],
+              "path": ["token"]
+            }
+          }
+        },
+        {
+          "name": "Create Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('token_latest', res.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/token/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["token", "create"]
+            }
+          }
+        },
+        {
+          "name": "Create Token for h1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('token_h1', res.token);",
+                  "  pm.collectionVariables.set('token_latest', res.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/token/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["token", "create"]
+            }
+          }
+        },
+        {
+          "name": "Create Token for h2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.token) {",
+                  "  pm.collectionVariables.set('token_h2', res.token);",
+                  "  pm.collectionVariables.set('token_latest', res.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/token/create",
+              "host": ["{{baseUrl}}"],
+              "path": ["token", "create"]
+            }
+          }
+        },
+        {
+          "name": "Revoke Latest Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{token_latest}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/token/revoke",
+              "host": ["{{baseUrl}}"],
+              "path": ["token", "revoke"]
+            }
+          }
+        },
+        {
+          "name": "Revoke h1 Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{token_h1}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/token/revoke",
+              "host": ["{{baseUrl}}"],
+              "path": ["token", "revoke"]
+            }
+          }
+        },
+        {
+          "name": "Revoke h2 Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{token_h2}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/token/revoke",
+              "host": ["{{baseUrl}}"],
+              "path": ["token", "revoke"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login h1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h1_ip}}\",\n  \"token\": \"{{token_h1}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login h2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h2_ip}}\",\n  \"token\": \"{{token_h2}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login h3 Using h1 Token - Expected to Fail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h3_ip}}\",\n  \"token\": \"{{token_h1}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Logout h1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h1_ip}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Logout h2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h2_ip}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "ACL",
+      "item": [
+        {
+          "name": "Get ACL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/acl",
+              "host": ["{{baseUrl}}"],
+              "path": ["acl"]
+            }
+          }
+        },
+        {
+          "name": "Block h1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h1_ip}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/acl/block",
+              "host": ["{{baseUrl}}"],
+              "path": ["acl", "block"]
+            }
+          }
+        },
+        {
+          "name": "Block h3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h3_ip}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/acl/block",
+              "host": ["{{baseUrl}}"],
+              "path": ["acl", "block"]
+            }
+          }
+        },
+        {
+          "name": "Allow h1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h1_ip}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/acl/allow",
+              "host": ["{{baseUrl}}"],
+              "path": ["acl", "allow"]
+            }
+          }
+        },
+        {
+          "name": "Allow h3",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ip\": \"{{h3_ip}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/acl/allow",
+              "host": ["{{baseUrl}}"],
+              "path": ["acl", "allow"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

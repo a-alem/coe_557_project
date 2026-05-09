@@ -170,7 +170,20 @@ The following controllers/APIs mapping are embedded into Ryu:
 - `/flows`: Controller for flow rules management
   - `POST /clear`: Manually clear all flow rules installed on the switch
 
-More details on the REST APIs with saved examples and payload structures are available in the POSTMAN collection of the project.
+
+# 🎯 Postman Collection
+To use the project's ready-made postman collection for testing the project, import `postman_collection.json` file into Postman.
+
+## 🏓 SSH Port Forwarding
+If you are planning on deploying the project on a remote instance, like what we did, and want to use the postman collection on your local machine to call the APIs that our Ryu controller exposes, you need to do ssh port-forwarding, here's how.
+
+From your local machine, run the following:
+```bash
+ssh -i your-key.pem -N -L <your_local_port>:127.0.0.1:8080 user@INSTANCE_URL
+```
+
+Now, your postman collection should work by sending requests to `http://127.0.0.1:8080`
+
 # 🔮 Future Work
 We plan on extending this project to include an API gateway and proper authentication for REST endpoints, where:
 - API gateway manages API endpoints versioning, and terminates traffic before it is forwarded back to the cluster of other endpoints.
